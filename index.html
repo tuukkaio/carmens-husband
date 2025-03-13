@@ -36,8 +36,8 @@
             width: 80px;
         }
         .stat-bar-container {
-            width: 150px;
-            height: 15px;
+            width: 200px;
+            height: 20px;
             background-color: #333;
             border-radius: 3px;
             margin-left: 10px;
@@ -45,6 +45,40 @@
         .stat-bar {
             height: 100%;
             border-radius: 3px;
+            background: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
+        }
+        #thank-you-btn {
+            padding: 8px 12px;
+            background-color: #FF4081;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #thank-you-btn:hover {
+            background-color: #F50057;
+        }
+        .speech-bubble {
+            position: absolute;
+            background: white;
+            border-radius: 10px;
+            padding: 5px 10px;
+            border: 2px solid #000;
+            font-size: 12px;
+            max-width: 150px;
+            text-align: center;
+            z-index: 100;
+        }
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: white transparent;
         }
         .controls {
             display: flex;
@@ -61,42 +95,63 @@
             padding: 10px;
             border-radius: 5px;
         }
+        #character-portraits {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .character-portrait {
+            background-color: rgba(0, 0, 102, 0.7);
+            border-radius: 5px;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            color: white;
+        }
+        .portrait-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
     <div id="instructions">
-        Click on the ground to move the character<br>
-        WASD or Arrow Keys to rotate camera<br>
-        Mouse wheel to zoom
+        Click on the ground to move Mike<br>
+        Camera is fixed in an isometric view<br>
+        Carmen and her husband will move around the house automatically
     </div>
+    <div id="character-portraits">
+        <div class="character-portrait">
+            <div class="portrait-circle" style="background-color: #2196F3;"></div>
+            <div>Mike</div>
+        </div>
+        <div class="character-portrait">
+            <div class="portrait-circle" style="background-color: #FF5252;"></div>
+            <div>Carmen</div>
+        </div>
+        <div class="character-portrait">
+            <div class="portrait-circle" style="background-color: #4CAF50;"></div>
+            <div>Carmen's Husband</div>
+        </div>
+    </div>
+
     <div id="ui">
         <div class="stats">
             <div class="stat-row">
-                <div class="stat-name">Hunger</div>
+                <div class="stat-name">Gayness</div>
                 <div class="stat-bar-container">
-                    <div id="hunger-bar" class="stat-bar" style="width: 75%; background-color: #4CAF50;"></div>
+                    <div id="gayness-bar" class="stat-bar" style="width: 85%;"></div>
                 </div>
             </div>
-            <div class="stat-row">
-                <div class="stat-name">Energy</div>
-                <div class="stat-bar-container">
-                    <div id="energy-bar" class="stat-bar" style="width: 60%; background-color: #2196F3;"></div>
-                </div>
-            </div>
-            <div class="stat-row">
-                <div class="stat-name">Fun</div>
-                <div class="stat-bar-container">
-                    <div id="fun-bar" class="stat-bar" style="width: 40%; background-color: #9C27B0;"></div>
-                </div>
-            </div>
-            <div class="stat-row">
-                <div class="stat-name">Social</div>
-                <div class="stat-bar-container">
-                    <div id="social-bar" class="stat-bar" style="width: 55%; background-color: #FF9800;"></div>
-                </div>
-            </div>
+            <button id="thank-you-btn">Say Thank You</button>
         </div>
         <div class="controls">
+            <div id="active-character">Playing as: Mike</div>
             <div id="time">7:15 AM</div>
             <div id="money">§4,668</div>
         </div>
@@ -303,6 +358,9 @@
             lookAtPos.y = character.position.y;
             character.lookAt(lookAtPos);
             
+            // Show character name when moving
+            showCharacterName('Mike', 2000);
+            
             // Animate movement
             new TWEEN.Tween(character.position)
                 .to({
@@ -313,8 +371,68 @@
                 .onComplete(() => {
                     isMoving = false;
                     decreaseStats();
+                    
+                    // Check if player is close to other characters and trigger interaction
+                    checkCharacterInteractions();
                 })
                 .start();
+        }
+        
+        // Character name display
+        function showCharacterName(name, duration = 2000) {
+            // Create or update character name display
+            let nameDiv = document.getElementById('character-name');
+            if (!nameDiv) {
+                nameDiv = document.createElement('div');
+                nameDiv.id = 'character-name';
+                nameDiv.style.position = 'absolute';
+                nameDiv.style.top = '50px';
+                nameDiv.style.left = '50%';
+                nameDiv.style.transform = 'translateX(-50%)';
+                nameDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                nameDiv.style.color = 'white';
+                nameDiv.style.padding = '5px 10px';
+                nameDiv.style.borderRadius = '5px';
+                nameDiv.style.fontWeight = 'bold';
+                nameDiv.style.zIndex = '100';
+                document.body.appendChild(nameDiv);
+            }
+            
+            nameDiv.textContent = name;
+            nameDiv.style.display = 'block';
+            
+            // Hide after duration
+            setTimeout(() => {
+                nameDiv.style.display = 'none';
+            }, duration);
+        }
+        
+        // Check for interactions with other characters
+        function checkCharacterInteractions() {
+            // Distance threshold for interaction
+            const interactionDistance = 1.5;
+            
+            // Check distance to Carmen
+            const distanceToCarmen = character.position.distanceTo(carmen.position);
+            if (distanceToCarmen < interactionDistance) {
+                // Show Carmen's name
+                showCharacterName('Carmen', 2000);
+                
+                // Increase social stat when interacting
+                stats.social = Math.min(100, stats.social + 10);
+                updateStatsUI();
+            }
+            
+            // Check distance to husband
+            const distanceToHusband = character.position.distanceTo(husband.position);
+            if (distanceToHusband < interactionDistance) {
+                // Show husband's name
+                showCharacterName('Carmen\'s Husband', 2000);
+                
+                // Increase social stat when interacting
+                stats.social = Math.min(100, stats.social + 10);
+                updateStatsUI();
+            }
         }
         
         // Click handler for movement
