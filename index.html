@@ -1,424 +1,9 @@
-// Very simple fallback rendering using requestAnimationFrame
-            function animate() {
-                requestAnimationFrame(animate);
-                
-                try {
-                    // Update functions
-                    TWEEN.update();
-                    updateCameraPosition();
-                    updateGameTime();
-                    updateNPCMovements();
-                    
-                    // Render scene
-                    renderer.render(scene, camera);
-                } catch (error) {
-                    console.error("Rendering error:", error);
-                    document.getElementById('loading').style.display = 'block';
-                    document.getElementById('loading').textContent = 'Rendering error: ' + error.message;
-                }
-            }
-            
-            // Add thank you button functionality
-            document.getElementById('thank-you-btn').addEventListener('click', () => {
-                createSpeechBubble("Thank You", character, false, 3000);
-                
-                // Increase gayness when saying thank you
-                stats.gayness = Math.min(100, stats.gayness + 5);
-                updateStatsUI();
-            });
-
-            // Create a permanent speech bubble for Carmen's Husband
-            setTimeout(() => {
-                try {
-                    const husbandBubble = createSpeechBubble("Would you like to donate to my charity Who's In My Butt?", husband, true);
-                } catch (e) {
-                    console.error("Error creating husband's speech bubble:", e);
-                }
-            }, 2000);
-            
-            // Initialize simple scene first to ensure rendering works
-            try {
-                // Initialize camera position
-                updateCameraPosition();
-                updateStatsUI();
-                animate();
-                
-                // Hide loading message
-                document.getElementById('loading').style.display = 'none';
-            } catch (e) {
-                console.error("Error initializing scene:", e);
-                document.getElementById('loading').textContent = 'Error initializing scene: ' + e.message;
-                document.getElementById('fallback').style.display = 'block';
-            }
-        }
-    </script>
-</body>
-</html>            // Keyboard controls
-            const keysPressed = {};
-            
-            window.addEventListener('keydown', (event) => {
-                keysPressed[event.key] = true;
-            });
-            
-            window.addEventListener('keyup', (event) => {
-                keysPressed[event.key] = false;
-            });
-            
-            function handleCameraControls() {
-                // No camera rotation controls - camera is fixed
-                updateCameraPosition();
-            }
-            
-            // Window resize handler
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-            
-            // Character needs stats
-            const stats = {
-                gayness: 85
-            };
-
-            function updateStatsUI() {
-                document.getElementById('gayness-bar').style.width = `${stats.gayness}%`;
-            }
-
-            function decreaseStats() {
-                // Gayness never decreases, only increases
-                stats.gayness = Math.min(100, stats.gayness + 0.5);
-                updateStatsUI();
-            }
-            
-            // Game time
-            let gameMinutes = 435; // 7:15 AM (435 minutes from midnight)
-            const minutesPerSecond = 2; // Game time passes faster than real time
-            
-            function updateGameTime() {
-                gameMinutes += minutesPerSecond * (1/60); // Update based on frame rate
-                if (gameMinutes >= 1440) {
-                    gameMinutes -= 1440; // Reset after 24 hours
-                }
-                
-                const hours = Math.floor(gameMinutes / 60);
-                const minutes = Math.floor(gameMinutes % 60);
-                const ampm = hours >= 12 ? 'PM' : 'AM';
-                const hours12 = hours % 12 || 12; // Convert to 12-hour format
-                
-                document.getElementById('time').textContent = 
-                    `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-            }            // Click handler for movement
-            const raycaster = new THREE.Raycaster();
-            const mouse = new THREE.Vector2();
-            
-            function onMouseClick(event) {
-                // Calculate mouse position in normalized device coordinates
-                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-                
-                // Update the picking ray with the camera and mouse position
-                raycaster.setFromCamera(mouse, camera);
-                
-                // Calculate objects intersecting the picking ray
-                const intersects = raycaster.intersectObjects([ground]);
-                
-                if (intersects.length > 0) {
-                    moveCharacter(intersects[0].point);
-                }
-            }
-            
-            window.addEventListener('click', onMouseClick, false);
-            
-            // Fixed camera settings
-            const cameraPosition = { x: 10, y: 15, z: 15 };
-            const cameraTarget = { x: 0, y: 0, z: 0 };
-
-            function updateCameraPosition() {
-                // Fixed position, only update the target to follow the character
-                camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
-                cameraTarget.x = character.position.x;
-                cameraTarget.z = character.position.z;
-                camera.lookAt(cameraTarget.x, 0, cameraTarget.z);
-            }            // Speech bubble system
-            function createSpeechBubble(text, characterObject, permanent = false, duration = 3000) {
-                let bubble = document.createElement('div');
-                bubble.className = 'speech-bubble';
-                bubble.textContent = text;
-                document.body.appendChild(bubble);
-                
-                // Function to update position based on character position
-                function updateBubblePosition() {
-                    // Convert 3D position to screen coordinates
-                    const vector = new THREE.Vector3();
-                    vector.setFromMatrixPosition(characterObject.matrixWorld);
-                    vector.project(camera);
-                    
-                    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-                    const y = -(vector.y * 0.5 - 0.5) * window.innerHeight;
-                    
-                    bubble.style.left = `${x - (bubble.offsetWidth / 2)}px`;
-                    bubble.style.top = `${y - 80}px`; // Position above character head
-                }
-                
-                // Add bubble to update loop
-                function bubbleUpdateLoop() {
-                    if (!bubble) return;
-                    updateBubblePosition();
-                    if (permanent) requestAnimationFrame(bubbleUpdateLoop);
-                }
-                
-                bubbleUpdateLoop();
-                
-                // Remove bubble after duration unless permanent
-                if (!permanent) {
-                    setTimeout(() => {
-                        if (bubble) {
-                            bubble.remove();
-                            bubble = null;
-                        }
-                    }, duration);
-                }
-                
-                return bubble;
-            }            // Character name display
-            function showCharacterName(name, duration = 2000) {
-                // Create or update character name display
-                let nameDiv = document.getElementById('character-name');
-                if (!nameDiv) {
-                    nameDiv = document.createElement('div');
-                    nameDiv.id = 'character-name';
-                    nameDiv.style.position = 'absolute';
-                    nameDiv.style.top = '50px';
-                    nameDiv.style.left = '50%';
-                    nameDiv.style.transform = 'translateX(-50%)';
-                    nameDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                    nameDiv.style.color = 'white';
-                    nameDiv.style.padding = '5px 10px';
-                    nameDiv.style.borderRadius = '5px';
-                    nameDiv.style.fontWeight = 'bold';
-                    nameDiv.style.zIndex = '100';
-                    document.body.appendChild(nameDiv);
-                }
-                
-                nameDiv.textContent = name;
-                nameDiv.style.display = 'block';
-                
-                // Hide after duration
-                setTimeout(() => {
-                    nameDiv.style.display = 'none';
-                }, duration);
-            }
-            
-            // Check for interactions with other characters
-            function checkCharacterInteractions() {
-                // Distance threshold for interaction
-                const interactionDistance = 1.5;
-                
-                // Check distance to Carmen
-                const distanceToCarmen = character.position.distanceTo(carmen.position);
-                if (distanceToCarmen < interactionDistance) {
-                    // Show Carmen's name
-                    showCharacterName('Carmen', 2000);
-                    
-                    // Increase gayness stat when interacting
-                    stats.gayness = Math.min(100, stats.gayness + 3);
-                    updateStatsUI();
-                    
-                    // Random chance to say something
-                    if (Math.random() < 0.4) {
-                        createSpeechBubble("Hey there cutie!", carmen, false, 3000);
-                    }
-                }
-                
-                // Check distance to husband
-                const distanceToHusband = character.position.distanceTo(husband.position);
-                if (distanceToHusband < interactionDistance) {
-                    // Show husband's name
-                    showCharacterName('Carmen\'s Husband', 2000);
-                    
-                    // Increase gayness stat when interacting with husband
-                    stats.gayness = Math.min(100, stats.gayness + 8);
-                    updateStatsUI();
-                }
-            }            // Character movement animation
-            let isMoving = false;
-            let targetPosition = new THREE.Vector3();
-            
-            function moveCharacter(targetPos) {
-                if (isMoving) return;
-                
-                isMoving = true;
-                targetPosition.copy(targetPos);
-                
-                // Make sure character stays on the ground
-                targetPosition.y = character.position.y;
-                
-                // Calculate distance and duration based on speed
-                const distance = character.position.distanceTo(targetPosition);
-                const duration = (distance / CHARACTER_SPEED) * 1000; // Convert to milliseconds
-                
-                // Look at target
-                const lookAtPos = targetPosition.clone();
-                lookAtPos.y = character.position.y;
-                character.lookAt(lookAtPos);
-                
-                // Show character name when moving
-                showCharacterName('Mike', 2000);
-                
-                // Animate movement
-                new TWEEN.Tween(character.position)
-                    .to({
-                        x: targetPosition.x,
-                        z: targetPosition.z
-                    }, duration)
-                    .easing(TWEEN.Easing.Quadratic.InOut)
-                    .onComplete(() => {
-                        isMoving = false;
-                        
-                        // Check if player is close to other characters and trigger interaction
-                        checkCharacterInteractions();
-                        
-                        // Increase gayness stat when moving
-                        stats.gayness = Math.min(100, stats.gayness + 1);
-                        updateStatsUI();
-                    })
-                    .start();
-            }            // Add environment objects
-            const trees = [
-                createTree(-8, -8, 1.5),
-                createTree(-7, 5, 1.2),
-                createTree(8, -7, 1.8),
-                createTree(10, 3, 1.3),
-                createTree(-4, 10, 1.4),
-                createTree(6, 10, 1.6)
-            ];
-
-            const bushes = [
-                createBush(-3, 0, 0.8),
-                createBush(-6, -2, 0.6),
-                createBush(-5, -6, 0.7),
-                createBush(6, -3, 0.5),
-                createBush(4, 8, 0.9),
-                createBush(-2, 7, 0.6),
-                createBush(0, -7, 0.8),
-                createBush(8, 6, 0.7)
-            ];
-
-            // Add all environment objects to the scene
-            trees.forEach(tree => scene.add(tree));
-            bushes.forEach(bush => scene.add(bush));
-
-            // Create signs
-            const houseSign = createSign("Gay Manor", -5, 0, -5.5, 1.5, 0.6);
-            scene.add(houseSign);
-
-            const streetSign = createSign("Gaylord Avenue", 4, 0, 12, 2, 0.5);
-            scene.add(streetSign);            // Create a sign
-            function createSign(text, x, y, z, width = 2, height = 0.8) {
-                const sign = new THREE.Group();
-                
-                // Sign post
-                const postGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8);
-                const postMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Brown
-                const post = new THREE.Mesh(postGeometry, postMaterial);
-                post.position.y = 0.6;
-                post.castShadow = true;
-                sign.add(post);
-                
-                // Sign board
-                const boardGeometry = new THREE.BoxGeometry(width, height, 0.05);
-                const boardMaterial = new THREE.MeshBasicMaterial({ color: 0xF5DEB3 }); // Wheat color
-                const board = new THREE.Mesh(boardGeometry, boardMaterial);
-                board.position.y = 1.2;
-                board.castShadow = true;
-                sign.add(board);
-                
-                // Create canvas for text
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.width = 256;
-                canvas.height = 128;
-                
-                // Background
-                context.fillStyle = '#F5DEB3';
-                context.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Text
-                context.font = 'bold 36px Arial';
-                context.textAlign = 'center';
-                context.textBaseline = 'middle';
-                context.fillStyle = '#000000';
-                context.fillText(text, canvas.width / 2, canvas.height / 2);
-                
-                // Apply canvas as texture
-                const texture = new THREE.CanvasTexture(canvas);
-                const textMaterial = new THREE.MeshBasicMaterial({ map: texture });
-                
-                // Create text mesh
-                const textGeometry = new THREE.PlaneGeometry(width - 0.1, height - 0.1);
-                const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-                textMesh.position.set(0, 1.2, 0.03);
-                sign.add(textMesh);
-                
-                sign.position.set(x, y, z);
-                return sign;
-            }            // Create environment objects
-            function createTree(x, z, scale = 1) {
-                const tree = new THREE.Group();
-
-                // Trunk
-                const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.3 * scale, 1 * scale, 8);
-                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
-                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-                trunk.position.y = 0.5 * scale;
-                trunk.castShadow = true;
-                tree.add(trunk);
-
-                // Leaves
-                const leavesGeometry = new THREE.ConeGeometry(1 * scale, 2 * scale, 8);
-                const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Forest green
-                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-                leaves.position.y = 1.8 * scale;
-                leaves.castShadow = true;
-                tree.add(leaves);
-
-                tree.position.set(x, 0, z);
-                return tree;
-            }
-
-            function createBush(x, z, scale = 1) {
-                const bush = new THREE.Group();
-
-                // Create a random number of "puffs" for the bush
-                const puffCount = 3 + Math.floor(Math.random() * 3);
-                
-                for (let i = 0; i < puffCount; i++) {
-                    const puffGeometry = new THREE.SphereGeometry(0.3 * scale + Math.random() * 0.2 * scale, 8, 8);
-                    const puffMaterial = new THREE.MeshStandardMaterial({ 
-                        color: 0x2E8B57 // Sea green
-                    });
-                    const puff = new THREE.Mesh(puffGeometry, puffMaterial);
-                    
-                    // Position randomly but clustered
-                    puff.position.set(
-                        (Math.random() - 0.5) * 0.6 * scale,
-                        0.3 * scale + Math.random() * 0.2 * scale,
-                        (Math.random() - 0.5) * 0.6 * scale
-                    );
-                    
-                    puff.castShadow = true;
-                    bush.add(puff);
-                }
-                
-                bush.position.set(x, 0, z);
-                return bush;
-            }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carmen's Husband</title>
+    <title>Sims-like Game</title>
     <style>
         body {
             margin: 0;
@@ -951,585 +536,440 @@
                     // Make husband look where he's going
                     husband.lookAt(randomX, 0, randomZ);
                 }
-            }<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sims-like Game</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
-        canvas {
-            display: block;
-        }
-        #ui {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            background-color: rgba(0, 0, 102, 0.7);
-            color: white;
-            padding: 10px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .stats {
-            display: flex;
-            flex-direction: column;
-            width: 70%;
-        }
-        .stat-row {
-            display: flex;
-            margin-bottom: 5px;
-        }
-        .stat-name {
-            width: 80px;
-        }
-        .stat-bar-container {
-            width: 200px;
-            height: 20px;
-            background-color: #333;
-            border-radius: 3px;
-            margin-left: 10px;
-        }
-        .stat-bar {
-            height: 100%;
-            border-radius: 3px;
-            background: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
-        }
-        #thank-you-btn {
-            padding: 8px 12px;
-            background-color: #FF4081;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        #thank-you-btn:hover {
-            background-color: #F50057;
-        }
-        .speech-bubble {
-            position: absolute;
-            background: white;
-            border-radius: 10px;
-            padding: 5px 10px;
-            border: 2px solid #000;
-            font-size: 12px;
-            max-width: 150px;
-            text-align: center;
-            z-index: 100;
-        }
-        .speech-bubble:after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 10px 10px 0;
-            border-style: solid;
-            border-color: white transparent;
-        }
-        .controls {
-            display: flex;
-            flex-direction: column;
-            width: 30%;
-            align-items: flex-end;
-        }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        #character-portraits {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .character-portrait {
-            background-color: rgba(0, 0, 102, 0.7);
-            border-radius: 5px;
-            padding: 5px;
-            display: flex;
-            align-items: center;
-            color: white;
-        }
-        .portrait-circle {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div id="instructions">
-        Click on the ground to move Mike<br>
-        Camera is fixed in an isometric view<br>
-        Carmen and her husband will move around the house automatically
-    </div>
-    <div id="character-portraits">
-        <div class="character-portrait">
-            <div class="portrait-circle" style="background-color: #2196F3;"></div>
-            <div>Mike</div>
-        </div>
-        <div class="character-portrait">
-            <div class="portrait-circle" style="background-color: #FF5252;"></div>
-            <div>Carmen</div>
-        </div>
-        <div class="character-portrait">
-            <div class="portrait-circle" style="background-color: #4CAF50;"></div>
-            <div>Carmen's Husband</div>
-        </div>
-    </div>
+            }
 
-    <div id="ui">
-        <div class="stats">
-            <div class="stat-row">
-                <div class="stat-name">Gayness</div>
-                <div class="stat-bar-container">
-                    <div id="gayness-bar" class="stat-bar" style="width: 85%;"></div>
-                </div>
-            </div>
-            <button id="thank-you-btn">Say Thank You</button>
-        </div>
-        <div class="controls">
-            <div id="active-character">Playing as: Mike</div>
-            <div id="time">7:15 AM</div>
-            <div id="money">§4,668</div>
-        </div>
-    </div>
+            // Create environment objects
+            function createTree(x, z, scale = 1) {
+                const tree = new THREE.Group();
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
-    <script>
-        // Constants
-        const GRID_SIZE = 1;
-        const CHARACTER_SPEED = 2; // Units per second
-        
-        // Scene setup
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue
-        
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(10, 10, 10);
-        
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
-        
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
-        
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 10, 5);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 1024;
-        directionalLight.shadow.mapSize.height = 1024;
-        scene.add(directionalLight);
-        
-        // Grid helper (for development)
-        const gridHelper = new THREE.GridHelper(20, 20);
-        scene.add(gridHelper);
-        
-        // Create ground
-        const groundGeometry = new THREE.PlaneGeometry(20, 20);
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x8BC34A, // Green
-            side: THREE.DoubleSide
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
-        
-        // Create a simple house
-        function createHouse() {
-            const house = new THREE.Group();
-            
-            // Floor
-            const floorGeometry = new THREE.BoxGeometry(5, 0.2, 5);
-            const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xB97A57 }); // Brown
-            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.position.y = 0.1;
-            floor.receiveShadow = true;
-            house.add(floor);
-            
-            // Walls
-            const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xF5F5DC }); // Beige
-            
-            // Back wall
-            const backWallGeometry = new THREE.BoxGeometry(5, 2, 0.2);
-            const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
-            backWall.position.set(0, 1.1, -2.4);
-            backWall.castShadow = true;
-            house.add(backWall);
-            
-            // Left wall
-            const leftWallGeometry = new THREE.BoxGeometry(0.2, 2, 5);
-            const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
-            leftWall.position.set(-2.4, 1.1, 0);
-            leftWall.castShadow = true;
-            house.add(leftWall);
-            
-            // Right wall (partial)
-            const rightWallGeometry = new THREE.BoxGeometry(0.2, 2, 3);
-            const rightWall = new THREE.Mesh(rightWallGeometry, wallMaterial);
-            rightWall.position.set(2.4, 1.1, -1);
-            rightWall.castShadow = true;
-            house.add(rightWall);
-            
-            // Front wall (partial)
-            const frontWallGeometry = new THREE.BoxGeometry(3, 2, 0.2);
-            const frontWall = new THREE.Mesh(frontWallGeometry, wallMaterial);
-            frontWall.position.set(-1, 1.1, 2.4);
-            frontWall.castShadow = true;
-            house.add(frontWall);
-            
-            // Furniture - TV
-            const tvStandGeometry = new THREE.BoxGeometry(1, 0.5, 0.5);
-            const tvStandMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037 }); // Dark brown
-            const tvStand = new THREE.Mesh(tvStandGeometry, tvStandMaterial);
-            tvStand.position.set(0, 0.35, -1.5);
-            tvStand.castShadow = true;
-            house.add(tvStand);
-            
-            const tvGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.1);
-            const tvMaterial = new THREE.MeshStandardMaterial({ color: 0x212121 }); // Dark grey
-            const tv = new THREE.Mesh(tvGeometry, tvMaterial);
-            tv.position.set(0, 0.9, -1.5);
-            tv.castShadow = true;
-            house.add(tv);
-            
-            // Furniture - Sofa
-            const sofaBaseGeometry = new THREE.BoxGeometry(2, 0.3, 0.8);
-            const sofaBaseMaterial = new THREE.MeshStandardMaterial({ color: 0xCFD8DC }); // Light grey
-            const sofaBase = new THREE.Mesh(sofaBaseGeometry, sofaBaseMaterial);
-            sofaBase.position.set(0, 0.25, -0.5);
-            sofaBase.castShadow = true;
-            house.add(sofaBase);
-            
-            const sofaBackGeometry = new THREE.BoxGeometry(2, 0.6, 0.2);
-            const sofaBack = new THREE.Mesh(sofaBackGeometry, sofaBaseMaterial);
-            sofaBack.position.set(0, 0.6, -0.85);
-            sofaBack.castShadow = true;
-            house.add(sofaBack);
-            
-            return house;
-        }
-        
-        const house = createHouse();
-        house.position.set(-3, 0, -3);
-        scene.add(house);
-        
-        // Create character
-        function createCharacter() {
-            const character = new THREE.Group();
-            
-            // Body
-            const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.8, 8);
-            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2196F3 }); // Blue
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.y = 0.4;
-            body.castShadow = true;
-            character.add(body);
-            
-            // Head
-            const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
-            const headMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE0B2 }); // Skin color
-            const head = new THREE.Mesh(headGeometry, headMaterial);
-            head.position.y = 0.95;
-            head.castShadow = true;
-            character.add(head);
-            
-            // Arms
-            const armGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
-            const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2196F3 }); // Blue
-            
-            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-            leftArm.position.set(-0.3, 0.5, 0);
-            leftArm.castShadow = true;
-            character.add(leftArm);
-            
-            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-            rightArm.position.set(0.3, 0.5, 0);
-            rightArm.castShadow = true;
-            character.add(rightArm);
-            
-            // Legs
-            const legGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
-            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x424242 }); // Dark grey
-            
-            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-            leftLeg.position.set(-0.15, 0.05, 0);
-            leftLeg.castShadow = true;
-            character.add(leftLeg);
-            
-            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-            rightLeg.position.set(0.15, 0.05, 0);
-            rightLeg.castShadow = true;
-            character.add(rightLeg);
-            
-            return character;
-        }
-        
-        const character = createCharacter();
-        character.position.set(0, 0, 0);
-        scene.add(character);
-        
-        // Character movement animation
-        let isMoving = false;
-        let targetPosition = new THREE.Vector3();
-        
-        function moveCharacter(targetPos) {
-            if (isMoving) return;
-            
-            isMoving = true;
-            targetPosition.copy(targetPos);
-            
-            // Make sure character stays on the ground
-            targetPosition.y = character.position.y;
-            
-            // Calculate distance and duration based on speed
-            const distance = character.position.distanceTo(targetPosition);
-            const duration = (distance / CHARACTER_SPEED) * 1000; // Convert to milliseconds
-            
-            // Look at target
-            const lookAtPos = targetPosition.clone();
-            lookAtPos.y = character.position.y;
-            character.lookAt(lookAtPos);
-            
-            // Show character name when moving
-            showCharacterName('Mike', 2000);
-            
-            // Animate movement
-            new TWEEN.Tween(character.position)
-                .to({
-                    x: targetPosition.x,
-                    z: targetPosition.z
-                }, duration)
-                .easing(TWEEN.Easing.Quadratic.InOut)
-                .onComplete(() => {
-                    isMoving = false;
-                    decreaseStats();
+                // Trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.3 * scale, 1 * scale, 8);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.y = 0.5 * scale;
+                trunk.castShadow = true;
+                tree.add(trunk);
+
+                // Leaves
+                const leavesGeometry = new THREE.ConeGeometry(1 * scale, 2 * scale, 8);
+                const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Forest green
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.y = 1.8 * scale;
+                leaves.castShadow = true;
+                tree.add(leaves);
+
+                tree.position.set(x, 0, z);
+                return tree;
+            }
+
+            function createBush(x, z, scale = 1) {
+                const bush = new THREE.Group();
+
+                // Create a random number of "puffs" for the bush
+                const puffCount = 3 + Math.floor(Math.random() * 3);
+                
+                for (let i = 0; i < puffCount; i++) {
+                    const puffGeometry = new THREE.SphereGeometry(0.3 * scale + Math.random() * 0.2 * scale, 8, 8);
+                    const puffMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x2E8B57 // Sea green
+                    });
+                    const puff = new THREE.Mesh(puffGeometry, puffMaterial);
                     
-                    // Check if player is close to other characters and trigger interaction
-                    checkCharacterInteractions();
-                })
-                .start();
-        }
-        
-        // Character name display
-        function showCharacterName(name, duration = 2000) {
-            // Create or update character name display
-            let nameDiv = document.getElementById('character-name');
-            if (!nameDiv) {
-                nameDiv = document.createElement('div');
-                nameDiv.id = 'character-name';
-                nameDiv.style.position = 'absolute';
-                nameDiv.style.top = '50px';
-                nameDiv.style.left = '50%';
-                nameDiv.style.transform = 'translateX(-50%)';
-                nameDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                nameDiv.style.color = 'white';
-                nameDiv.style.padding = '5px 10px';
-                nameDiv.style.borderRadius = '5px';
-                nameDiv.style.fontWeight = 'bold';
-                nameDiv.style.zIndex = '100';
-                document.body.appendChild(nameDiv);
+                    // Position randomly but clustered
+                    puff.position.set(
+                        (Math.random() - 0.5) * 0.6 * scale,
+                        0.3 * scale + Math.random() * 0.2 * scale,
+                        (Math.random() - 0.5) * 0.6 * scale
+                    );
+                    
+                    puff.castShadow = true;
+                    bush.add(puff);
+                }
+                
+                bush.position.set(x, 0, z);
+                return bush;
+            }
+
+            // Create a sign
+            function createSign(text, x, y, z, width = 2, height = 0.8) {
+                const sign = new THREE.Group();
+                
+                // Sign post
+                const postGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8);
+                const postMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Brown
+                const post = new THREE.Mesh(postGeometry, postMaterial);
+                post.position.y = 0.6;
+                post.castShadow = true;
+                sign.add(post);
+                
+                // Sign board
+                const boardGeometry = new THREE.BoxGeometry(width, height, 0.05);
+                const boardMaterial = new THREE.MeshBasicMaterial({ color: 0xF5DEB3 }); // Wheat color
+                const board = new THREE.Mesh(boardGeometry, boardMaterial);
+                board.position.y = 1.2;
+                board.castShadow = true;
+                sign.add(board);
+                
+                // Create canvas for text
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 128;
+                
+                // Background
+                context.fillStyle = '#F5DEB3';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Text
+                context.font = 'bold 36px Arial';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillStyle = '#000000';
+                context.fillText(text, canvas.width / 2, canvas.height / 2);
+                
+                // Apply canvas as texture
+                const texture = new THREE.CanvasTexture(canvas);
+                const textMaterial = new THREE.MeshBasicMaterial({ map: texture });
+                
+                // Create text mesh
+                const textGeometry = new THREE.PlaneGeometry(width - 0.1, height - 0.1);
+                const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+                textMesh.position.set(0, 1.2, 0.03);
+                sign.add(textMesh);
+                
+                sign.position.set(x, y, z);
+                return sign;
+            }
+
+            // Add environment objects
+            const trees = [
+                createTree(-8, -8, 1.5),
+                createTree(-7, 5, 1.2),
+                createTree(8, -7, 1.8),
+                createTree(10, 3, 1.3),
+                createTree(-4, 10, 1.4),
+                createTree(6, 10, 1.6)
+            ];
+
+            const bushes = [
+                createBush(-3, 0, 0.8),
+                createBush(-6, -2, 0.6),
+                createBush(-5, -6, 0.7),
+                createBush(6, -3, 0.5),
+                createBush(4, 8, 0.9),
+                createBush(-2, 7, 0.6),
+                createBush(0, -7, 0.8),
+                createBush(8, 6, 0.7)
+            ];
+
+            // Add all environment objects to the scene
+            trees.forEach(tree => scene.add(tree));
+            bushes.forEach(bush => scene.add(bush));
+
+            // Create signs
+            const houseSign = createSign("Gay Manor", -5, 0, -5.5, 1.5, 0.6);
+            scene.add(houseSign);
+
+            const streetSign = createSign("Gaylord Avenue", 4, 0, 12, 2, 0.5);
+            scene.add(streetSign);
+
+            // Character movement animation
+            let isMoving = false;
+            let targetPosition = new THREE.Vector3();
+            
+            function moveCharacter(targetPos) {
+                if (isMoving) return;
+                
+                // Make sure character stays on the ground
+                targetPosition.y = character.position.y;
+                
+                // Calculate distance and duration based on speed
+                const distance = character.position.distanceTo(targetPosition);
+                const duration = (distance / CHARACTER_SPEED) * 1000; // Convert to milliseconds
+                
+                // Look at target
+                const lookAtPos = targetPosition.clone();
+                lookAtPos.y = character.position.y;
+                character.lookAt(lookAtPos);
+                
+                // Show character name when moving
+                showCharacterName('Mike', 2000);
+                
+                // Animate movement
+                new TWEEN.Tween(character.position)
+                    .to({
+                        x: targetPosition.x,
+                        z: targetPosition.z
+                    }, duration)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .onComplete(() => {
+                        isMoving = false;
+                        
+                        // Check if player is close to other characters and trigger interaction
+                        checkCharacterInteractions();
+                        
+                        // Increase gayness stat when moving
+                        stats.gayness = Math.min(100, stats.gayness + 1);
+                        updateStatsUI();
+                    })
+                    .start();
             }
             
-            nameDiv.textContent = name;
-            nameDiv.style.display = 'block';
+            // Character name display
+            function showCharacterName(name, duration = 2000) {
+                // Create or update character name display
+                let nameDiv = document.getElementById('character-name');
+                if (!nameDiv) {
+                    nameDiv = document.createElement('div');
+                    nameDiv.id = 'character-name';
+                    nameDiv.style.position = 'absolute';
+                    nameDiv.style.top = '50px';
+                    nameDiv.style.left = '50%';
+                    nameDiv.style.transform = 'translateX(-50%)';
+                    nameDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                    nameDiv.style.color = 'white';
+                    nameDiv.style.padding = '5px 10px';
+                    nameDiv.style.borderRadius = '5px';
+                    nameDiv.style.fontWeight = 'bold';
+                    nameDiv.style.zIndex = '100';
+                    document.body.appendChild(nameDiv);
+                }
+                
+                nameDiv.textContent = name;
+                nameDiv.style.display = 'block';
+                
+                // Hide after duration
+                setTimeout(() => {
+                    nameDiv.style.display = 'none';
+                }, duration);
+            }
             
-            // Hide after duration
+            // Check for interactions with other characters
+            function checkCharacterInteractions() {
+                // Distance threshold for interaction
+                const interactionDistance = 1.5;
+                
+                // Check distance to Carmen
+                const distanceToCarmen = character.position.distanceTo(carmen.position);
+                if (distanceToCarmen < interactionDistance) {
+                    // Show Carmen's name
+                    showCharacterName('Carmen', 2000);
+                    
+                    // Increase gayness stat when interacting
+                    stats.gayness = Math.min(100, stats.gayness + 3);
+                    updateStatsUI();
+                    
+                    // Random chance to say something
+                    if (Math.random() < 0.4) {
+                        createSpeechBubble("Hey there cutie!", carmen, false, 3000);
+                    }
+                }
+                
+                // Check distance to husband
+                const distanceToHusband = character.position.distanceTo(husband.position);
+                if (distanceToHusband < interactionDistance) {
+                    // Show husband's name
+                    showCharacterName('Carmen\'s Husband', 2000);
+                    
+                    // Increase gayness stat when interacting with husband
+                    stats.gayness = Math.min(100, stats.gayness + 8);
+                    updateStatsUI();
+                }
+            }
+            
+            // Speech bubble system
+            function createSpeechBubble(text, characterObject, permanent = false, duration = 3000) {
+                let bubble = document.createElement('div');
+                bubble.className = 'speech-bubble';
+                bubble.textContent = text;
+                document.body.appendChild(bubble);
+                
+                // Function to update position based on character position
+                function updateBubblePosition() {
+                    // Convert 3D position to screen coordinates
+                    const vector = new THREE.Vector3();
+                    vector.setFromMatrixPosition(characterObject.matrixWorld);
+                    vector.project(camera);
+                    
+                    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = -(vector.y * 0.5 - 0.5) * window.innerHeight;
+                    
+                    bubble.style.left = `${x - (bubble.offsetWidth / 2)}px`;
+                    bubble.style.top = `${y - 80}px`; // Position above character head
+                }
+                
+                // Add bubble to update loop
+                function bubbleUpdateLoop() {
+                    if (!bubble) return;
+                    updateBubblePosition();
+                    if (permanent) requestAnimationFrame(bubbleUpdateLoop);
+                }
+                
+                bubbleUpdateLoop();
+                
+                // Remove bubble after duration unless permanent
+                if (!permanent) {
+                    setTimeout(() => {
+                        if (bubble) {
+                            bubble.remove();
+                            bubble = null;
+                        }
+                    }, duration);
+                }
+                
+                return bubble;
+            }
+            
+            // Click handler for movement
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            function onMouseClick(event) {
+                // Calculate mouse position in normalized device coordinates
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Update the picking ray with the camera and mouse position
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Calculate objects intersecting the picking ray
+                const intersects = raycaster.intersectObjects([ground]);
+                
+                if (intersects.length > 0) {
+                    moveCharacter(intersects[0].point);
+                }
+            }
+            
+            window.addEventListener('click', onMouseClick, false);
+            
+            // Fixed camera settings
+            const cameraPosition = { x: 10, y: 15, z: 15 };
+            const cameraTarget = { x: 0, y: 0, z: 0 };
+
+            function updateCameraPosition() {
+                // Fixed position, only update the target to follow the character
+                camera.position.set(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+                cameraTarget.x = character.position.x;
+                cameraTarget.z = character.position.z;
+                camera.lookAt(cameraTarget.x, 0, cameraTarget.z);
+            }
+            
+            // Keyboard controls
+            const keysPressed = {};
+            
+            window.addEventListener('keydown', (event) => {
+                keysPressed[event.key] = true;
+            });
+            
+            window.addEventListener('keyup', (event) => {
+                keysPressed[event.key] = false;
+            });
+            
+            function handleCameraControls() {
+                // No camera rotation controls - camera is fixed
+                updateCameraPosition();
+            }
+            
+            // Window resize handler
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            // Add error handling to debug any rendering issues
+            window.addEventListener('error', (event) => {
+                console.error('Error occurred:', event.error);
+                alert('An error occurred in the game: ' + event.error.message);
+            });
+            
+            // Character needs stats
+            const stats = {
+                gayness: 85
+            };
+
+            function updateStatsUI() {
+                document.getElementById('gayness-bar').style.width = `${stats.gayness}%`;
+            }
+
+            function decreaseStats() {
+                // Gayness never decreases, only increases
+                stats.gayness = Math.min(100, stats.gayness + 0.5);
+                updateStatsUI();
+            }
+            
+            // Game time
+            let gameMinutes = 435; // 7:15 AM (435 minutes from midnight)
+            const minutesPerSecond = 2; // Game time passes faster than real time
+            
+            function updateGameTime() {
+                gameMinutes += minutesPerSecond * (1/60); // Update based on frame rate
+                if (gameMinutes >= 1440) {
+                    gameMinutes -= 1440; // Reset after 24 hours
+                }
+                
+                const hours = Math.floor(gameMinutes / 60);
+                const minutes = Math.floor(gameMinutes % 60);
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const hours12 = hours % 12 || 12; // Convert to 12-hour format
+                
+                document.getElementById('time').textContent = 
+                    `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+            }
+            
+            // Very simple fallback rendering using requestAnimationFrame
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                try {
+                    // Update functions
+                    TWEEN.update();
+                    updateCameraPosition();
+                    updateGameTime();
+                    updateNPCMovements();
+                    
+                    // Render scene
+                    renderer.render(scene, camera);
+                } catch (error) {
+                    console.error("Rendering error:", error);
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('loading').textContent = 'Rendering error: ' + error.message;
+                }
+            }
+            
+            // Add thank you button functionality
+            document.getElementById('thank-you-btn').addEventListener('click', () => {
+                createSpeechBubble("Thank You", character, false, 3000);
+                
+                // Increase gayness when saying thank you
+                stats.gayness = Math.min(100, stats.gayness + 5);
+                updateStatsUI();
+            });
+
+            // Create a permanent speech bubble for Carmen's Husband
             setTimeout(() => {
-                nameDiv.style.display = 'none';
-            }, duration);
-        }
-        
-        // Check for interactions with other characters
-        function checkCharacterInteractions() {
-            // Distance threshold for interaction
-            const interactionDistance = 1.5;
+                try {
+                    const husbandBubble = createSpeechBubble("Would you like to donate to my charity Who's In My Butt?", husband, true);
+                } catch (e) {
+                    console.error("Error creating husband's speech bubble:", e);
+                }
+            }, 2000);
             
-            // Check distance to Carmen
-            const distanceToCarmen = character.position.distanceTo(carmen.position);
-            if (distanceToCarmen < interactionDistance) {
-                // Show Carmen's name
-                showCharacterName('Carmen', 2000);
-                
-                // Increase social stat when interacting
-                stats.social = Math.min(100, stats.social + 10);
+            // Initialize simple scene first to ensure rendering works
+            try {
+                // Initialize camera position
+                updateCameraPosition();
                 updateStatsUI();
-            }
-            
-            // Check distance to husband
-            const distanceToHusband = character.position.distanceTo(husband.position);
-            if (distanceToHusband < interactionDistance) {
-                // Show husband's name
-                showCharacterName('Carmen\'s Husband', 2000);
+                animate();
                 
-                // Increase social stat when interacting
-                stats.social = Math.min(100, stats.social + 10);
-                updateStatsUI();
+                // Hide loading message
+                document.getElementById('loading').style.display = 'none';
+            } catch (e) {
+                console.error("Error initializing scene:", e);
+                document.getElementById('loading').textContent = 'Error initializing scene: ' + e.message;
+                document.getElementById('fallback').style.display = 'block';
             }
         }
-        
-        // Click handler for movement
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        
-        function onMouseClick(event) {
-            // Calculate mouse position in normalized device coordinates
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            
-            // Update the picking ray with the camera and mouse position
-            raycaster.setFromCamera(mouse, camera);
-            
-            // Calculate objects intersecting the picking ray
-            const intersects = raycaster.intersectObjects([ground]);
-            
-            if (intersects.length > 0) {
-                moveCharacter(intersects[0].point);
-            }
-        }
-        
-        window.addEventListener('click', onMouseClick, false);
-        
-        // Camera controls
-        let cameraRotationSpeed = 0.02;
-        let cameraDistance = 15;
-        let cameraAngle = 0;
-        let cameraHeight = 10;
-        
-        function updateCameraPosition() {
-            const x = character.position.x + Math.sin(cameraAngle) * cameraDistance;
-            const z = character.position.z + Math.cos(cameraAngle) * cameraDistance;
-            
-            camera.position.set(x, cameraHeight, z);
-            camera.lookAt(character.position);
-        }
-        
-        // Keyboard controls
-        const keysPressed = {};
-        
-        window.addEventListener('keydown', (event) => {
-            keysPressed[event.key] = true;
-        });
-        
-        window.addEventListener('keyup', (event) => {
-            keysPressed[event.key] = false;
-        });
-        
-        function handleCameraControls() {
-            // Rotate camera left
-            if (keysPressed['a'] || keysPressed['A'] || keysPressed['ArrowLeft']) {
-                cameraAngle += cameraRotationSpeed;
-            }
-            
-            // Rotate camera right
-            if (keysPressed['d'] || keysPressed['D'] || keysPressed['ArrowRight']) {
-                cameraAngle -= cameraRotationSpeed;
-            }
-            
-            // Move camera forward (zoom in)
-            if (keysPressed['w'] || keysPressed['W'] || keysPressed['ArrowUp']) {
-                cameraDistance = Math.max(5, cameraDistance - 0.1);
-            }
-            
-            // Move camera backward (zoom out)
-            if (keysPressed['s'] || keysPressed['S'] || keysPressed['ArrowDown']) {
-                cameraDistance = Math.min(20, cameraDistance + 0.1);
-            }
-            
-            updateCameraPosition();
-        }
-        
-        // Mouse wheel for zoom
-        window.addEventListener('wheel', (event) => {
-            cameraDistance += event.deltaY * 0.01;
-            cameraDistance = Math.max(5, Math.min(20, cameraDistance));
-            updateCameraPosition();
-        });
-        
-        // Window resize handler
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        // Character needs stats
-        const stats = {
-            hunger: 75,
-            energy: 60,
-            fun: 40,
-            social: 55
-        };
-        
-        function updateStatsUI() {
-            document.getElementById('hunger-bar').style.width = `${stats.hunger}%`;
-            document.getElementById('energy-bar').style.width = `${stats.energy}%`;
-            document.getElementById('fun-bar').style.width = `${stats.fun}%`;
-            document.getElementById('social-bar').style.width = `${stats.social}%`;
-        }
-        
-        function decreaseStats() {
-            stats.hunger = Math.max(0, stats.hunger - 2);
-            stats.energy = Math.max(0, stats.energy - 1);
-            stats.fun = Math.max(0, stats.fun - 1.5);
-            stats.social = Math.max(0, stats.social - 1);
-            updateStatsUI();
-        }
-        
-        // Game time
-        let gameMinutes = 435; // 7:15 AM (435 minutes from midnight)
-        const minutesPerSecond = 2; // Game time passes faster than real time
-        
-        function updateGameTime() {
-            gameMinutes += minutesPerSecond * (1/60); // Update based on frame rate
-            if (gameMinutes >= 1440) {
-                gameMinutes -= 1440; // Reset after 24 hours
-            }
-            
-            const hours = Math.floor(gameMinutes / 60);
-            const minutes = Math.floor(gameMinutes % 60);
-            const ampm = hours >= 12 ? 'PM' : 'AM';
-            const hours12 = hours % 12 || 12; // Convert to 12-hour format
-            
-            document.getElementById('time').textContent = 
-                `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-        }
-        
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            TWEEN.update();
-            handleCameraControls();
-            updateGameTime();
-            
-            renderer.render(scene, camera);
-        }
-        
-        // Initialize camera position
-        updateCameraPosition();
-        updateStatsUI();
-        animate();
     </script>
 </body>
 </html>
