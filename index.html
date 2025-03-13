@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sims-like Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation;
+        }
+        canvas {
+            display: block;
+            touch-action: manipulation;
+        }
+        #ui {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 102, 0.8);
+            color: white;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            flex-wrap: wrap;
+        }
+        .action-button {
+            position: absolute;
+            bottom: 100%;
+            background-color: #FF1493;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+        .action-button:hover {
+            background-color: #ff4aae;
+            transform: scale(1.05);
+        }
+        .action-button:active {
+            transform: scale(0.95);
+        }
+        #bite-button {
+            left: 30%;
+            transform: translateX(-50%);
+        }
+        #beer-button {
+            left: 70%;
+            transform: translateX(-50%);
+            background-color: #FF8C00; /* Orange */
+        }
+        #beer-button:hover {
+            background-color: #FFA500;
+        }
+        .stats {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .stat-row {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .stat-name {
+            width: 100px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .stat-bar-container {
+            width: calc(100% - 110px);
+            height: 24px;
+            background-color: #333;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        .stat-bar {
+            height: 100%;
+            border-radius: 5px;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+        }
+        .controls div {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        #time {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+        #tagline {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFFFFF;
+            text-shadow: 0 0 3px #000000;
+            margin-top: 5px;
+            letter-spacing: 1px;
+        }
+        #instructions {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 100;
+        }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            .stat-name {
+                font-size: 16px;
+                width: 80px;
+            }
+            .stat-bar-container {
+                width: calc(100% - 90px);
+            }
+            .controls div {
+                font-size: 16px;
+            }
+            #instructions {
+                padding: 10px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        Click on the ground to move the character
+    </div>
+    <div id="ui">
+        <div class="stats">
+            <div class="stat-row">
+                <div class="stat-name">Gayness</div>
+                <div class="stat-bar-container">
+                    <div id="gayness-bar" class="stat-bar" style="width: 85%; background-image: linear-gradient(to right, #FF0000, #FF8000, #FFFF00, #00FF00, #0080FF, #8000FF);"></div>
+                </div>
+            </div>
+        </div>
+        <div class="controls">
+            <div id="time">7:15 AM</div>
+            <div id="tagline">Just a day in the life of MIKE</div>
+        </div>
+        <button id="bite-button" class="action-button">Say "Thank You"</button>
+        <button id="beer-button" class="action-button">Give Carmen Beer</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script>
+        // Constants
+        const GRID_SIZE = 1;
+        const CHARACTER_SPEED = 2; // Units per second
+        
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(10, 10, 10);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 1024;
+        directionalLight.shadow.mapSize.height = 1024;
+        scene.add(directionalLight);
+        
+        // Grid helper (for development)
+        const gridHelper = new THREE.GridHelper(20, 20);
+        scene.add(gridHelper);
+        
+        // Create ground
+        const groundGeometry = new THREE.PlaneGeometry(20, 20);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x8BC34A, // Green
+            side: THREE.DoubleSide
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // Create street leading to the house
+        function createStreet() {
+            const street = new THREE.Group();
+            
+            // Road
+            const roadGeometry = new THREE.PlaneGeometry(3, 12);
+            const roadMaterial = new THREE.MeshStandardMaterial({
+                color: 0x444444, // Dark gray for asphalt
+                side: THREE.DoubleSide
+            });
+            const road = new THREE.Mesh(roadGeometry, roadMaterial);
+            road.rotation.x = -Math.PI / 2;
+            road.position.set(-3, 0.01, 4); // 0.01 to avoid z-fighting with ground
+            road.receiveShadow = true;
+            street.add(road);
+            
+            // Road markings - center line
+            const centerLineGeometry = new THREE.PlaneGeometry(0.1, 10);
+            const centerLineMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFFFFF, // White
+                side: THREE.DoubleSide
+            });
+            const centerLine = new THREE.Mesh(centerLineGeometry, centerLineMaterial);
+            centerLine.rotation.x = -Math.PI / 2;
+            centerLine.position.set(-3, 0.02, 4); // Slightly above road
+            centerLine.receiveShadow = true;
+            street.add(centerLine);
+            
+            // Road markings - dashed lines (simplified as small rectangles)
+            for (let i = -5; i <= 3; i += 2) {
+                const dashGeometry = new THREE.PlaneGeometry(0.5, 0.1);
+                const dash = new THREE.Mesh(dashGeometry, centerLineMaterial);
+                dash.rotation.x = -Math.PI / 2;
+                dash.position.set(-2, 0.02, i + 4);
+                dash.receiveShadow = true;
+                street.add(dash);
+                
+                const dashRight = new THREE.Mesh(dashGeometry, centerLineMaterial);
+                dashRight.rotation.x = -Math.PI / 2;
+                dashRight.position.set(-4, 0.02, i + 4);
+                dashRight.receiveShadow = true;
+                street.add(dashRight);
+            }
+            
+            // Sidewalk left
+            const sidewalkLeftGeometry = new THREE.BoxGeometry(0.5, 0.1, 12);
+            const sidewalkMaterial = new THREE.MeshStandardMaterial({
+                color: 0xCCCCCC, // Light gray
+            });
+            const sidewalkLeft = new THREE.Mesh(sidewalkLeftGeometry, sidewalkMaterial);
+            sidewalkLeft.position.set(-1.3, 0.05, 4);
+            sidewalkLeft.receiveShadow = true;
+            street.add(sidewalkLeft);
+            
+            // Sidewalk right
+            const sidewalkRight = new THREE.Mesh(sidewalkLeftGeometry, sidewalkMaterial);
+            sidewalkRight.position.set(-4.7, 0.05, 4);
+            sidewalkRight.receiveShadow = true;
+            street.add(sidewalkRight);
+            
+            // Create street sign - moved more to the right and rotated
+            const signPost = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.05, 0.05, 2, 8),
+                new THREE.MeshStandardMaterial({ color: 0x888888 }) // Gray metal
+            );
+            signPost.position.set(1.5, 1, -1.5);  // Moved from -1.5 to 1.5 on x-axis
+            signPost.castShadow = true;
+            street.add(signPost);
+            
+            // Sign plate - straight, not rotated
+            const signPlate = new THREE.Mesh(
+                new THREE.BoxGeometry(1.5, 0.4, 0.05),
+                new THREE.MeshStandardMaterial({ color: 0x006400 }) // Dark green
+            );
+            signPlate.position.set(2.0, 1.7, -1.5);  // Moved from -1.0 to 2.0 on x-axis
+            // No rotation - sign is straight now
+            signPlate.castShadow = true;
+            street.add(signPlate);
+            
+            // Sign text (using sprite with canvas) - brought to front
+            const signText = createStreetSign("Gaylord Avenue");
+            signText.position.set(2.0, 1.7, -1.4);  // Increased z value to bring forward
+            
+            // Set high renderOrder to ensure it renders on top of other objects
+            signText.renderOrder = 999;
+            signText.material.depthTest = false; // Disable depth testing to force it to render on top
+            
+            street.add(signText);
+            
+            return street;
+        }
+        
+        // Function to create street sign text
+        function createStreetSign(text) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 64;
+            
+            // Background - transparent
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Text
+            context.fillStyle = 'white';
+            context.font = 'bold 36px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            // Create texture and sprite
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(1.5, 0.4, 1);
+            
+            return sprite;
+        }
+        
+        const street = createStreet();
+        scene.add(street);
+        
+        // Create brewery building on the east side of the map
+        function createBrewery() {
+            const brewery = new THREE.Group();
+            
+            // Main building structure
+            const buildingGeometry = new THREE.BoxGeometry(6, 4, 8);
+            const buildingMaterial = new THREE.MeshStandardMaterial({ color: 0xA05A2C }); // Brick red/brown
+            const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+            building.position.y = 2;
+            building.castShadow = true;
+            building.receiveShadow = true;
+            brewery.add(building);
+            
+            // Roof (slightly larger than building)
+            const roofGeometry = new THREE.BoxGeometry(6.5, 0.5, 8.5);
+            const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 }); // Dark gray
+            const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+            roof.position.y = 4.25;
+            roof.castShadow = true;
+            brewery.add(roof);
+            
+            // Chimney
+            const chimneyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+            const chimneyMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+            const chimney = new THREE.Mesh(chimneyGeometry, chimneyMaterial);
+            chimney.position.set(2, 5.5, 2);
+            chimney.castShadow = true;
+            brewery.add(chimney);
+            
+            // Factory smoke (simple particles)
+            const smokeParticles = new THREE.Group();
+            for (let i = 0; i < 5; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.2 + i * 0.1, 8, 8);
+                const particleMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xCCCCCC, 
+                    transparent: true,
+                    opacity: 0.8 - (i * 0.15) 
+                });
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.position.set(2, 6.5 + (i * 0.4), 2);
+                smokeParticles.add(particle);
+            }
+            brewery.add(smokeParticles);
+            
+            // Front door
+            const doorGeometry = new THREE.BoxGeometry(1, 2, 0.1);
+            const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+            const door = new THREE.Mesh(doorGeometry, doorMaterial);
+            door.position.set(0, 1, 4.05);
+            brewery.add(door);
+            
+            // Windows
+            const windowMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xADD8E6, // Light blue
+                transparent: true,
+                opacity: 0.7 
+            });
+            
+            // Front windows
+            for (let i = -1.5; i <= 1.5; i += 1.5) {
+                const windowGeometry = new THREE.BoxGeometry(1, 1, 0.1);
+                const windowFront = new THREE.Mesh(windowGeometry, windowMaterial);
+                windowFront.position.set(i, 2.5, 4.05);
+                brewery.add(windowFront);
+            }
+            
+            // Side windows
+            for (let i = -2; i <= 2; i += 2) {
+                for (let j = -1.5; j <= 1.5; j += 1.5) {
+                    const windowGeometry = new THREE.BoxGeometry(0.1, 1, 1);
+                    const windowSide = new THREE.Mesh(windowGeometry, windowMaterial);
+                    windowSide.position.set(3.05, i + 2, j);
+                    brewery.add(windowSide);
+                    
+                    const windowSide2 = new THREE.Mesh(windowGeometry, windowMaterial);
+                    windowSide2.position.set(-3.05, i + 2, j);
+                    brewery.add(windowSide2);
+                }
+            }
+            
+            // Support structure for raised brewery sign
+            const signPostLeft = new THREE.Mesh(
+                new THREE.BoxGeometry(0.2, 2.5, 0.2),
+                new THREE.MeshStandardMaterial({ color: 0x333333 }) // Dark gray metal
+            );
+            signPostLeft.position.set(-2, 5.5, 0); // Left side, above roof
+            brewery.add(signPostLeft);
+            
+            const signPostRight = new THREE.Mesh(
+                new THREE.BoxGeometry(0.2, 2.5, 0.2),
+                new THREE.MeshStandardMaterial({ color: 0x333333 }) // Dark gray metal
+            );
+            signPostRight.position.set(2, 5.5, 0); // Right side, above roof
+            brewery.add(signPostRight);
+            
+            // Horizontal support beam
+            const signBeam = new THREE.Mesh(
+                new THREE.BoxGeometry(4.4, 0.2, 0.2),
+                new THREE.MeshStandardMaterial({ color: 0x333333 }) // Dark gray metal
+            );
+            signBeam.position.set(0, 6.7, 0); // Top of posts
+            brewery.add(signBeam);
+            
+            // "BREWERY" sign plate - now straight and above the building
+            const brewerySignPlate = new THREE.Mesh(
+                new THREE.BoxGeometry(4, 1.2, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513 }) // Wooden brown
+            );
+            brewerySignPlate.position.set(0, 6.1, 0); // Hanging from the beam above the building
+            brewery.add(brewerySignPlate);
+            
+            // Sign text - now above the building and brought to the front
+            const brewerySign = createBrewerySign("BREWERY");
+            brewerySign.position.set(0, 6.1, 0.3); // Increased z-position to bring forward
+            brewerySign.scale.set(3.5, 0.9, 1); // Adjust scale to match new position
+            
+            // Set high renderOrder to ensure it renders on top of other objects
+            brewerySign.renderOrder = 999;
+            brewerySign.material.depthTest = false; // Disable depth testing to force it to render on top
+            
+            brewery.add(brewerySign);
+            
+            // Position the entire brewery on the right (east) side of the map
+            brewery.position.set(8, 0, 0);
+            
+            return brewery;
+        }
+        
+        // Function to create the brewery sign
+        function createBrewerySign(text) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 128;
+            
+            // Background - wood-like color
+            context.fillStyle = '#8B4513';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Border
+            context.strokeStyle = '#4A2511';
+            context.lineWidth = 10;
+            context.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+            
+            // Text
+            context.fillStyle = '#FFD700'; // Gold
+            context.font = 'bold 84px serif';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            // Create texture and sprite
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(4, 1, 1);
+            
+            return sprite;
+        }
+        
+        const brewery = createBrewery();
+        scene.add(brewery);
+        
+        // Create trees and plants around the house
+        function createNature() {
+            const natureGroup = new THREE.Group();
+            
+            // Function to create a tree
+            function createTree(x, z, scale = 1) {
+                const tree = new THREE.Group();
+                
+                // Tree trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.1 * scale, 0.15 * scale, 0.8 * scale, 8);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.y = 0.4 * scale;
+                trunk.castShadow = true;
+                tree.add(trunk);
+                
+                // Tree foliage (multiple layers for fuller appearance)
+                const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Forest green
+                
+                for (let i = 0; i < 3; i++) {
+                    const yPos = 0.7 * scale + (i * 0.3 * scale);
+                    const size = 0.7 * scale - (i * 0.15 * scale);
+                    
+                    const foliageGeometry = new THREE.ConeGeometry(size, size, 8);
+                    const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+                    foliage.position.y = yPos;
+                    foliage.castShadow = true;
+                    tree.add(foliage);
+                }
+                
+                tree.position.set(x, 0, z);
+                return tree;
+            }
+            
+            // Function to create a bush/plant
+            function createBush(x, z, scale = 1, color = 0x32CD32) {
+                const bush = new THREE.Group();
+                
+                // Create multiple slightly offset spheres for a bushier look
+                const bushMaterial = new THREE.MeshStandardMaterial({ color: color });
+                
+                const mainSphereGeom = new THREE.SphereGeometry(0.3 * scale, 8, 8);
+                const mainSphere = new THREE.Mesh(mainSphereGeom, bushMaterial);
+                mainSphere.position.y = 0.3 * scale;
+                mainSphere.castShadow = true;
+                bush.add(mainSphere);
+                
+                // Add some varied smaller spheres around the main one
+                for (let i = 0; i < 5; i++) {
+                    const smallSphereGeom = new THREE.SphereGeometry(0.2 * scale, 8, 8);
+                    const smallSphere = new THREE.Mesh(smallSphereGeom, bushMaterial);
+                    
+                    // Position randomly around center
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 0.15 * scale;
+                    smallSphere.position.set(
+                        Math.cos(angle) * radius,
+                        0.3 * scale + (Math.random() * 0.2 - 0.1) * scale,
+                        Math.sin(angle) * radius
+                    );
+                    
+                    smallSphere.castShadow = true;
+                    bush.add(smallSphere);
+                }
+                
+                bush.position.set(x, 0, z);
+                return bush;
+            }
+            
+            // Function to create a flower
+            function createFlower(x, z, scale = 1) {
+                const flower = new THREE.Group();
+                
+                // Stem
+                const stemGeometry = new THREE.CylinderGeometry(0.02 * scale, 0.02 * scale, 0.3 * scale, 8);
+                const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Green
+                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                stem.position.y = 0.15 * scale;
+                stem.castShadow = true;
+                flower.add(stem);
+                
+                // Flower head colors (random selection)
+                const flowerColors = [0xFF1493, 0xFF69B4, 0xFFFF00, 0xFF6347, 0xBA55D3, 0xFFFFFF];
+                const flowerColor = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+                
+                // Flower head (circle of small spheres around center)
+                const centerGeometry = new THREE.SphereGeometry(0.05 * scale, 8, 8);
+                const centerMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 }); // Gold center
+                const center = new THREE.Mesh(centerGeometry, centerMaterial);
+                center.position.y = 0.3 * scale;
+                center.castShadow = true;
+                flower.add(center);
+                
+                const petalMaterial = new THREE.MeshStandardMaterial({ color: flowerColor });
+                
+                // Add petals around center
+                for (let i = 0; i < 8; i++) {
+                    const petalGeometry = new THREE.SphereGeometry(0.06 * scale, 8, 8);
+                    const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                    
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = 0.08 * scale;
+                    petal.position.set(
+                        Math.cos(angle) * radius,
+                        0.3 * scale,
+                        Math.sin(angle) * radius
+                    );
+                    
+                    petal.castShadow = true;
+                    flower.add(petal);
+                }
+                
+                flower.position.set(x, 0, z);
+                return flower;
+            }
+            
+            // Add trees around the house
+            natureGroup.add(createTree(-6, -5, 1.5));   // Larger tree near back corner
+            natureGroup.add(createTree(-7, -1, 1.2));   // Tree near side
+            natureGroup.add(createTree(-5.5, 2, 1.4));  // Tree near front corner
+            natureGroup.add(createTree(2, -6, 1.3));    // Tree opposite side
+            natureGroup.add(createTree(3, 2, 1.7));     // Large tree in distance
+            natureGroup.add(createTree(4, -3, 1.1));    // Smaller tree
+            
+            // Add bushes around the house base
+            natureGroup.add(createBush(-1, -5.5, 0.7));   // Near back of house
+            natureGroup.add(createBush(-5.5, -1, 0.8));   // Side of house
+            natureGroup.add(createBush(-5, -4.5, 0.7));   // Corner of house
+            natureGroup.add(createBush(-1, -1.2, 0.6));   // Near interior corner
+            
+            // Add flower beds with multiple flowers
+            const flowerColors = [0x32CD32, 0x228B22, 0x006400]; // Various green shades
+            
+            // Flower bed 1 - near house entrance
+            natureGroup.add(createBush(-3, 0.5, 0.5, flowerColors[0])); // Base greenery
+            for (let i = 0; i < 8; i++) {
+                const offsetX = (Math.random() - 0.5) * 0.6;
+                const offsetZ = (Math.random() - 0.5) * 0.6;
+                natureGroup.add(createFlower(-3 + offsetX, 0.5 + offsetZ, 0.7 + Math.random() * 0.3));
+            }
+            
+            // Flower bed 2 - along pathway
+            natureGroup.add(createBush(-1.8, -0.7, 0.5, flowerColors[1])); // Base greenery
+            for (let i = 0; i < 6; i++) {
+                const offsetX = (Math.random() - 0.5) * 0.5;
+                const offsetZ = (Math.random() - 0.5) * 0.5;
+                natureGroup.add(createFlower(-1.8 + offsetX, -0.7 + offsetZ, 0.6 + Math.random() * 0.4));
+            }
+            
+            // Scatter some individual flowers randomly
+            for (let i = 0; i < 15; i++) {
+                const x = (Math.random() - 0.5) * 15; // Spread across map
+                const z = (Math.random() - 0.5) * 15;
+                // Avoid placing too close to the road or house
+                if (Math.abs(x + 3) > 2 || Math.abs(z - 4) > 2) { // Not on road
+                    if (Math.abs(x + 3) > 3 || Math.abs(z + 3) > 3) { // Not in house
+                        natureGroup.add(createFlower(x, z, 0.5 + Math.random() * 0.4));
+                    }
+                }
+            }
+            
+            return natureGroup;
+        }
+        
+        const nature = createNature();
+        scene.add(nature);
+        
+        // Create lawnmower for the yard
+        function createLawnmower() {
+            const lawnmower = new THREE.Group();
+            
+            // Main body
+            const bodyGeometry = new THREE.BoxGeometry(0.7, 0.4, 1.1);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x8B0000 }); // Dark red
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.3;
+            body.castShadow = true;
+            lawnmower.add(body);
+            
+            // Handle
+            const handleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.8, 8);
+            const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 }); // Dark gray
+            const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+            handle.position.set(0, 0.7, -0.4);
+            handle.rotation.x = Math.PI / 4; // Angled handle
+            handle.castShadow = true;
+            lawnmower.add(handle);
+            
+            // Handle crossbar
+            const crossbarGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8);
+            const crossbar = new THREE.Mesh(crossbarGeometry, handleMaterial);
+            crossbar.position.set(0, 1, -0.65);
+            crossbar.rotation.z = Math.PI / 2; // Horizontal
+            crossbar.castShadow = true;
+            lawnmower.add(crossbar);
+            
+            // Wheels (4)
+            const wheelGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 16);
+            const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Black
+            
+            const wheelPositions = [
+                [-0.3, 0.12, 0.4],  // Front left
+                [0.3, 0.12, 0.4],   // Front right
+                [-0.3, 0.12, -0.4], // Back left
+                [0.3, 0.12, -0.4]   // Back right
+            ];
+            
+            wheelPositions.forEach(position => {
+                const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel.position.set(...position);
+                wheel.rotation.x = Math.PI / 2; // Rotate to stand upright
+                wheel.castShadow = true;
+                lawnmower.add(wheel);
+            });
+            
+            // Engine
+            const engineGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.3);
+            const engineMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const engine = new THREE.Mesh(engineGeometry, engineMaterial);
+            engine.position.set(0, 0.55, 0.2);
+            engine.castShadow = true;
+            lawnmower.add(engine);
+            
+            // Position the lawnmower in the yard
+            lawnmower.position.set(-5, 0, 0); // Position on the lawn near the house
+            lawnmower.rotation.y = Math.PI / 6; // Rotated slightly
+            
+            return lawnmower;
+        }
+        
+        const lawnmower = createLawnmower();
+        scene.add(lawnmower);
+        
+        // Create a simple house
+        function createHouse() {
+            const house = new THREE.Group();
+            
+            // Floor
+            const floorGeometry = new THREE.BoxGeometry(5, 0.2, 5);
+            const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xB97A57 }); // Brown
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.position.y = 0.1;
+            floor.receiveShadow = true;
+            house.add(floor);
+            
+            // Walls
+            const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xF5F5DC }); // Beige
+            
+            // Back wall
+            const backWallGeometry = new THREE.BoxGeometry(5, 2, 0.2);
+            const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
+            backWall.position.set(0, 1.1, -2.4);
+            backWall.castShadow = true;
+            house.add(backWall);
+            
+            // Left wall
+            const leftWallGeometry = new THREE.BoxGeometry(0.2, 2, 5);
+            const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
+            leftWall.position.set(-2.4, 1.1, 0);
+            leftWall.castShadow = true;
+            house.add(leftWall);
+            
+            // Right wall (partial)
+            const rightWallGeometry = new THREE.BoxGeometry(0.2, 2, 3);
+            const rightWall = new THREE.Mesh(rightWallGeometry, wallMaterial);
+            rightWall.position.set(2.4, 1.1, -1);
+            rightWall.castShadow = true;
+            house.add(rightWall);
+            
+            // Front wall (partial)
+            const frontWallGeometry = new THREE.BoxGeometry(3, 2, 0.2);
+            const frontWall = new THREE.Mesh(frontWallGeometry, wallMaterial);
+            frontWall.position.set(-1, 1.1, 2.4);
+            frontWall.castShadow = true;
+            house.add(frontWall);
+            
+            // Furniture - TV
+            const tvStandGeometry = new THREE.BoxGeometry(1, 0.5, 0.5);
+            const tvStandMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037 }); // Dark brown
+            const tvStand = new THREE.Mesh(tvStandGeometry, tvStandMaterial);
+            tvStand.position.set(0, 0.35, -1.5);
+            tvStand.castShadow = true;
+            house.add(tvStand);
+            
+            const tvGeometry = new THREE.BoxGeometry(0.8, 0.6, 0.1);
+            const tvMaterial = new THREE.MeshStandardMaterial({ color: 0x212121 }); // Dark grey
+            const tv = new THREE.Mesh(tvGeometry, tvMaterial);
+            tv.position.set(0, 0.9, -1.5);
+            tv.castShadow = true;
+            house.add(tv);
+            
+            // Furniture - Sofa
+            const sofaBaseGeometry = new THREE.BoxGeometry(2, 0.3, 0.8);
+            const sofaBaseMaterial = new THREE.MeshStandardMaterial({ color: 0xCFD8DC }); // Light grey
+            const sofaBase = new THREE.Mesh(sofaBaseGeometry, sofaBaseMaterial);
+            sofaBase.position.set(0, 0.25, -0.5);
+            sofaBase.castShadow = true;
+            house.add(sofaBase);
+            
+            const sofaBackGeometry = new THREE.BoxGeometry(2, 0.6, 0.2);
+            const sofaBack = new THREE.Mesh(sofaBackGeometry, sofaBaseMaterial);
+            sofaBack.position.set(0, 0.6, -0.85);
+            sofaBack.castShadow = true;
+            house.add(sofaBack);
+            
+            return house;
+        }
+        
+        const house = createHouse();
+        house.position.set(-3, 0, -3);
+        scene.add(house);
+        
+        // Create character function 
+        function createCharacter(name, bodyColor = 0x2196F3, skinColor = 0xFFE0B2) {
+            const character = new THREE.Group();
+            
+            // Body
+            const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.8, 8);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.4;
+            body.castShadow = true;
+            character.add(body);
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: skinColor });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 0.95;
+            head.castShadow = true;
+            character.add(head);
+            
+            // Arms
+            const armGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.3, 0.5, 0);
+            leftArm.castShadow = true;
+            character.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.3, 0.5, 0);
+            rightArm.castShadow = true;
+            character.add(rightArm);
+            
+            // Legs
+            const legGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x424242 }); // Dark grey
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.15, 0.05, 0);
+            leftLeg.castShadow = true;
+            character.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.15, 0.05, 0);
+            rightLeg.castShadow = true;
+            character.add(rightLeg);
+            
+            // Name tag
+            const nameTag = createNameTag(name);
+            nameTag.position.y = 1.5; // Position above character's head
+            character.add(nameTag);
+            
+            return character;
+        }
+        
+        // Create character with a wider name tag
+        function createSpecialCharacter(name, bodyColor = 0x2196F3, skinColor = 0xFFE0B2, nameWidthScale = 2.0) {
+            const character = new THREE.Group();
+            
+            // Body
+            const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.8, 8);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.4;
+            body.castShadow = true;
+            character.add(body);
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+            const headMaterial = new THREE.MeshStandardMaterial({ color: skinColor });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 0.95;
+            head.castShadow = true;
+            character.add(head);
+            
+            // Arms
+            const armGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+            
+            const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+            leftArm.position.set(-0.3, 0.5, 0);
+            leftArm.castShadow = true;
+            character.add(leftArm);
+            
+            const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+            rightArm.position.set(0.3, 0.5, 0);
+            rightArm.castShadow = true;
+            character.add(rightArm);
+            
+            // Legs
+            const legGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
+            const legMaterial = new THREE.MeshStandardMaterial({ color: 0x424242 }); // Dark grey
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.15, 0.05, 0);
+            leftLeg.castShadow = true;
+            character.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.15, 0.05, 0);
+            rightLeg.castShadow = true;
+            character.add(rightLeg);
+            
+            // Special wider name tag
+            const nameTag = createSpecialNameTag(name, nameWidthScale);
+            nameTag.position.y = 1.5; // Position above character's head
+            character.add(nameTag);
+            
+            return character;
+        }
+        
+        // Function to create a name tag
+        function createNameTag(name) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;  // Doubled for better resolution
+            canvas.height = 128; // Doubled for better resolution
+            
+            // Background
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Border
+            context.strokeStyle = 'white';
+            context.lineWidth = 4;
+            context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+            
+            // Text
+            context.fillStyle = 'white';
+            context.font = 'bold 64px Arial'; // Larger, bolder font
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(name, canvas.width / 2, canvas.height / 2);
+            
+            // Create texture and sprite
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter; // Prevent blurry text
+            texture.magFilter = THREE.LinearFilter; // Prevent blurry text
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(1.6, 0.4, 1); // Larger scale
+            
+            return sprite;
+        }
+        
+        // Function to create a wider name tag for longer names
+        function createSpecialNameTag(name, widthScale = 2.0) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 1024;  // Doubled again for even better resolution and width
+            canvas.height = 128;  // Same height
+            
+            // Background
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Border
+            context.strokeStyle = 'white';
+            context.lineWidth = 4;
+            context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+            
+            // Text
+            context.fillStyle = 'white';
+            context.font = 'bold 64px Arial'; // Larger, bolder font
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // Draw text with proper fitting
+            const metrics = context.measureText(name);
+            const fontSize = Math.min(64, (canvas.width * 0.8) / metrics.width * 64);
+            context.font = `bold ${fontSize}px Arial`;
+            context.fillText(name, canvas.width / 2, canvas.height / 2);
+            
+            // Create texture and sprite
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter; // Prevent blurry text
+            texture.magFilter = THREE.LinearFilter; // Prevent blurry text
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(widthScale, 0.4, 1); // Wider scale for longer name
+            
+            // Add special rendering properties to ensure visibility
+            sprite.renderOrder = 999;
+            material.depthTest = false;
+            
+            return sprite;
+        }
+        
+        // Function to create a speech bubble
+        function createSpeechBubble(text, largeText = false) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 1200;  // Increased width for better resolution
+            canvas.height = 300;  // Increased height to accommodate larger text
+            
+            const padding = 25;
+            const bubbleTip = 40; // Larger speech bubble pointer
+            
+            // Draw the bubble background (rounded rectangle)
+            context.fillStyle = 'white';
+            // Main bubble
+            roundRect(context, 0, 0, canvas.width, canvas.height - bubbleTip, 25, true, false);
+            
+            // Draw the bubble pointer/tip
+            context.beginPath();
+            context.moveTo(canvas.width / 2 - 20, canvas.height - bubbleTip);
+            context.lineTo(canvas.width / 2, canvas.height);
+            context.lineTo(canvas.width / 2 + 20, canvas.height - bubbleTip);
+            context.fill();
+            
+            // Draw the bubble border
+            context.strokeStyle = 'black';
+            context.lineWidth = 8;
+            roundRect(context, 0, 0, canvas.width, canvas.height - bubbleTip, 25, false, true);
+            
+            // Draw connecting lines for the bubble pointer
+            context.beginPath();
+            context.moveTo(canvas.width / 2 - 20, canvas.height - bubbleTip);
+            context.lineTo(canvas.width / 2, canvas.height);
+            context.lineTo(canvas.width / 2 + 20, canvas.height - bubbleTip);
+            context.stroke();
+            
+            // Text styling - larger font size
+            context.fillStyle = 'black';
+            const fontSize = largeText ? 64 : 44; // Increased font size option
+            context.font = `bold ${fontSize}px Arial`;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            
+            // Split text into multiple lines if needed
+            const maxWidth = canvas.width - (padding * 2);
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = words[0];
+            
+            for (let i = 1; i < words.length; i++) {
+                const testLine = currentLine + ' ' + words[i];
+                const metrics = context.measureText(testLine);
+                if (metrics.width > maxWidth) {
+                    lines.push(currentLine);
+                    currentLine = words[i];
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            lines.push(currentLine);
+            
+            // Calculate line height and starting y position - larger line height
+            const lineHeight = largeText ? 70 : 50; // Increased line height for larger text
+            const totalTextHeight = lines.length * lineHeight;
+            let y = (canvas.height - bubbleTip - totalTextHeight) / 2 + lineHeight / 2;
+            
+            // Draw each line of text
+            for (let i = 0; i < lines.length; i++) {
+                context.fillText(lines[i], canvas.width / 2, y);
+                y += lineHeight;
+            }
+            
+            // Create texture and sprite
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(3.5, 1.8, 1); // Larger scale for bigger speech bubble
+            
+            return sprite;
+        }
+        
+        // Helper function to draw rounded rectangles
+        function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+            if (typeof radius === 'undefined') radius = 5;
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            if (fill) {
+                ctx.fill();
+            }
+            if (stroke) {
+                ctx.stroke();
+            }
+        }
+        
+        // Main character (player)
+        const character = createCharacter("Mike", 0x2196F3); // Blue
+        character.position.set(0, 0, 0);
+        scene.add(character);
+        
+        // Create Carmen character (in red dress)
+        const carmen = createCharacter("Carmen", 0xFF0000, 0xFFD700); // Red outfit, golden-ish skin
+        carmen.position.set(-3.5, 0, -2.5); // Position inside the house
+        carmen.rotation.y = Math.PI / 3; // Rotate to face inside the house
+        scene.add(carmen);
+        
+        // Create Carmen's husband (in green outfit) with wider name tag
+        const carmensHusband = createSpecialCharacter("Carmen's husband", 0x006400, 0xF5DEB3, 2.2); // Dark green outfit, wheat skin, wider name tag
+        carmensHusband.position.set(-3.8, 0, -3.5); // Position inside the house
+        carmensHusband.rotation.y = -Math.PI / 6; // Face slightly toward Carmen
+        scene.add(carmensHusband);
+        
+        // Add speech bubble to Carmen's husband - positioned higher with larger text
+        const speechBubble = createSpeechBubble("Would you like to donate to my charity called who's in my butt?", true);
+        speechBubble.position.y = 3.0; // Positioned higher above name tag (was 2.2)
+        carmensHusband.add(speechBubble);
+        
+        // Character movement animation
+        let isMoving = false;
+        let targetPosition = new THREE.Vector3();
+        
+        function moveCharacter(targetPos) {
+            if (isMoving) return;
+            
+            isMoving = true;
+            targetPosition.copy(targetPos);
+            
+            // Make sure character stays on the ground
+            targetPosition.y = character.position.y;
+            
+            // Calculate distance and duration based on speed
+            const distance = character.position.distanceTo(targetPosition);
+            const duration = (distance / CHARACTER_SPEED) * 1000; // Convert to milliseconds
+            
+            // Look at target
+            const lookAtPos = targetPosition.clone();
+            lookAtPos.y = character.position.y;
+            character.lookAt(lookAtPos);
+            
+            // Animate movement
+            new TWEEN.Tween(character.position)
+                .to({
+                    x: targetPosition.x,
+                    z: targetPosition.z
+                }, duration)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onUpdate(() => {
+                    // Camera will follow in the animation loop
+                })
+                .onComplete(() => {
+                    isMoving = false;
+                    decreaseStats();
+                })
+                .start();
+        }
+        
+        // Click/Touch handler for movement
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        
+        function onPointerDown(event) {
+            // Prevent default behavior for touch events
+            event.preventDefault();
+            
+            // Get proper coordinates whether it's mouse or touch
+            const x = event.clientX || (event.touches && event.touches[0].clientX);
+            const y = event.clientY || (event.touches && event.touches[0].clientY);
+            
+            if (x === undefined || y === undefined) return;
+            
+            // Calculate pointer position in normalized device coordinates
+            pointer.x = (x / window.innerWidth) * 2 - 1;
+            pointer.y = -(y / window.innerHeight) * 2 + 1;
+            
+            // Update the picking ray with the camera and pointer position
+            raycaster.setFromCamera(pointer, camera);
+            
+            // Calculate objects intersecting the picking ray
+            const intersects = raycaster.intersectObjects([ground]);
+            
+            if (intersects.length > 0) {
+                moveCharacter(intersects[0].point);
+            }
+        }
+        
+        // Add both mouse and touch event listeners
+        window.addEventListener('mousedown', onPointerDown, false);
+        window.addEventListener('touchstart', onPointerDown, { passive: false });
+        
+        // Camera setup to follow the main character from a fixed angle
+        function updateCameraToFollowCharacter() {
+            // Position the camera above and behind Mike at a fixed angle
+            const cameraHeight = 15;
+            const cameraDistance = 15;
+            
+            // Fixed angle (from the negative Z direction)
+            // This keeps the camera at a consistent viewing angle regardless of character rotation
+            const fixedCameraAngle = -Math.PI / 4; // 45 degrees from -Z axis (toward -X)
+            
+            // Set camera position relative to character using fixed angle
+            camera.position.set(
+                character.position.x + Math.sin(fixedCameraAngle) * cameraDistance,
+                character.position.y + cameraHeight,
+                character.position.z + Math.cos(fixedCameraAngle) * cameraDistance
+            );
+            
+            // Look at the character
+            camera.lookAt(character.position);
+        }
+        
+        // Initialize the camera
+        updateCameraToFollowCharacter();
+        
+        // Window resize handler with debounce for better performance on mobile
+        let resizeTimeout;
+        function handleResize() {
+            // Clear any existing timeout
+            clearTimeout(resizeTimeout);
+            
+            // Set a new timeout
+            resizeTimeout = setTimeout(() => {
+                // Get device pixel ratio (for high DPI displays)
+                const pixelRatio = window.devicePixelRatio || 1;
+                
+                // Update camera aspect ratio
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                
+                // Resize renderer with pixel ratio for better quality on mobile
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(pixelRatio, 2)); // Limit to 2x for performance
+            }, 100);
+        }
+        
+        // Handle initial sizing and resize events
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+        
+        // Character stats
+        const stats = {
+            gayness: 85
+        };
+        
+        function updateStatsUI() {
+            document.getElementById('gayness-bar').style.width = `${stats.gayness}%`;
+        }
+        
+        function updateGaynessBasedOnProximity() {
+            // Calculate distance to Carmen and Carmen's husband
+            const distanceToCarmen = character.position.distanceTo(carmen.position);
+            const distanceToHusband = character.position.distanceTo(carmensHusband.position);
+            
+            // Get the minimum distance to either character
+            const minDistance = Math.min(distanceToCarmen, distanceToHusband);
+            
+            // Define the distance threshold where gayness starts increasing
+            const maxEffectDistance = 10; // Units
+            const minEffectDistance = 1; // Units
+            
+            // If within effect range, calculate gayness boost
+            if (minDistance < maxEffectDistance) {
+                // Calculate gayness boost (more boost the closer Mike gets)
+                // Normalize distance to 0-1 range (1 = far away, 0 = very close)
+                const normalizedDistance = Math.max(0, (minDistance - minEffectDistance) / (maxEffectDistance - minEffectDistance));
+                
+                // Calculate gayness boost - maximum 50 boost at closest distance
+                const gaynessBoost = 50 * (1 - normalizedDistance);
+                
+                // Base value (minimum gayness)
+                const baseGayness = 50;
+                
+                // Set gayness based on proximity
+                stats.gayness = Math.min(100, baseGayness + gaynessBoost);
+            } else {
+                // If far away, gayness gradually returns to base level
+                stats.gayness = Math.max(50, stats.gayness - 0.5);
+            }
+            
+            updateStatsUI();
+        }
+        
+        function decreaseStats() {
+            // Update gayness based on proximity to Carmen and husband
+            updateGaynessBasedOnProximity();
+        }
+        
+        // Game time
+        let gameMinutes = 435; // 7:15 AM (435 minutes from midnight)
+        const minutesPerSecond = 2; // Game time passes faster than real time
+        
+        function updateGameTime() {
+            gameMinutes += minutesPerSecond * (1/60); // Update based on frame rate
+            if (gameMinutes >= 1440) {
+                gameMinutes -= 1440; // Reset after 24 hours
+            }
+            
+            const hours = Math.floor(gameMinutes / 60);
+            const minutes = Math.floor(gameMinutes % 60);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const hours12 = hours % 12 || 12; // Convert to 12-hour format
+            
+            document.getElementById('time').textContent = 
+                `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            TWEEN.update();
+            updateGameTime();
+            
+            // Update gayness based on proximity in real-time (every frame)
+            updateGaynessBasedOnProximity();
+            
+            // Update camera position to follow character
+            updateCameraToFollowCharacter();
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Handle the Bite button click
+        let mikeSpeechBubble = null;
+        let carmenSpeechBubble = null;
+        
+        document.getElementById('bite-button').addEventListener('click', () => {
+            // Remove existing speech bubble if there is one
+            if (mikeSpeechBubble) {
+                character.remove(mikeSpeechBubble);
+            }
+            
+            // Create a new speech bubble
+            mikeSpeechBubble = createSpeechBubble("Thank you!");
+            mikeSpeechBubble.position.y = 2.2; // Position above name tag
+            character.add(mikeSpeechBubble);
+            
+            // Remove the speech bubble after a few seconds
+            setTimeout(() => {
+                if (mikeSpeechBubble) {
+                    character.remove(mikeSpeechBubble);
+                    mikeSpeechBubble = null;
+                }
+            }, 3000);
+            
+            // Increase gayness a bit when saying thank you
+            stats.gayness = Math.min(100, stats.gayness + 5);
+            updateStatsUI();
+        });
+        
+        // Handle the Beer button click
+        document.getElementById('beer-button').addEventListener('click', () => {
+            // Remove existing speech bubble if there is one
+            if (carmenSpeechBubble) {
+                carmen.remove(carmenSpeechBubble);
+            }
+            
+            // Make Carmen respond with a speech bubble
+            carmenSpeechBubble = createSpeechBubble("Thanks for the beer! You're so sweet!", true);
+            carmenSpeechBubble.position.y = 2.2; // Position above name tag
+            carmen.add(carmenSpeechBubble);
+            
+            // Remove the speech bubble after a few seconds
+            setTimeout(() => {
+                if (carmenSpeechBubble) {
+                    carmen.remove(carmenSpeechBubble);
+                    carmenSpeechBubble = null;
+                }
+            }, 4000);
+            
+            // Increase gayness significantly for giving beer
+            stats.gayness = Math.min(100, stats.gayness + 15);
+            updateStatsUI();
+        });
+        
+        updateStatsUI();
+        animate();
+    </script>
+</body>
+</html>
