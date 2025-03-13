@@ -669,151 +669,175 @@
 </body>
 </html>
                     
-                    // Make Carmen look where she's going
-                    new TWEEN.Tween(carmen.rotation)
-                        .to({ y: Math.atan2(randomX - carmen.position.x, randomZ - carmen.position.z) }, 1000)
-                        .easing(TWEEN.Easing.Quadratic.InOut)
-                        .start();
-                }
-                
-                // Move husband independently
-                if (Math.random() < 0.003) { // 0.3% chance per frame
-                    const randomX = -4 + Math.random() * 2; // Different area of the house
-                    const randomZ = -3 + Math.random() * 2;
-                    
-                    new TWEEN.Tween(husband.position)
-                        .to({ x: randomX, z: randomZ }, 2500)
-                        .easing(TWEEN.Easing.Quadratic.InOut)
-                        .start();
-                    
-                    // Make husband look where he's going
-                    new TWEEN.Tween(husband.rotation)
-                        .to({ y: Math.atan2(randomX - husband.position.x, randomZ - husband.position.z) }, 1000)
-                        .easing(TWEEN.Easing.Quadratic.InOut)
-                        .start();
-                }
+ // Make Carmen look where she's going
+new TWEEN.Tween(carmen.rotation)
+    .to({ y: Math.atan2(randomX - carmen.position.x, randomZ - carmen.position.z) }, 1000)
+    .easing(TWEEN.Easing.Quadratic.InOut)
+    .start();
+}
+
+// Move husband independently
+if (Math.random() < 0.003) { // 0.3% chance per frame
+    const randomX = -4 + Math.random() * 2; // Different area of the house
+    const randomZ = -3 + Math.random() * 2;
+    
+    new TWEEN.Tween(husband.position)
+        .to({ x: randomX, z: randomZ }, 2500)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .start();
+    
+    // Make husband look where he's going
+    new TWEEN.Tween(husband.rotation)
+        .to({ y: Math.atan2(randomX - husband.position.x, randomZ - husband.position.z) }, 1000)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .start();
+}
+}
+
+// Character name display
+function showCharacterName(name, duration = 2000) {
+    // Create or update character name display
+    let nameDiv = document.getElementById('character-name');
+    if (!nameDiv) {
+        nameDiv = document.createElement('div');
+        nameDiv.id = 'character-name';
+        nameDiv.style.position = 'absolute';
+        nameDiv.style.top = '50px';
+        nameDiv.style.left = '50%';
+        nameDiv.style.transform = 'translateX(-50%)';
+        nameDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        nameDiv.style.color = 'white';
+        nameDiv.style.padding = '5px 10px';
+        nameDiv.style.borderRadius = '5px';
+        nameDiv.style.fontWeight = 'bold';
+        nameDiv.style.zIndex = '100';
+        document.body.appendChild(nameDiv);
+    }
+    
+    nameDiv.textContent = name;
+    nameDiv.style.display = 'block';
+    
+    // Hide after duration
+    setTimeout(() => {
+        nameDiv.style.display = 'none';
+    }, duration);
+}
+
+// Check for interactions with other characters
+function checkCharacterInteractions() {
+    // Distance threshold for interaction
+    const interactionDistance = 1.5;
+    
+    // Check distance to Carmen
+    const distanceToCarmen = character.position.distanceTo(carmen.position);
+    if (distanceToCarmen < interactionDistance) {
+        // Show Carmen's name
+        showCharacterName('Carmen', 2000);
+        
+        // Increase gayness stat when interacting
+        stats.gayness = Math.min(100, stats.gayness + 3);
+        updateStatsUI();
+        
+        // Random chance to say something
+        if (Math.random() < 0.4) {
+            createSpeechBubble("Hey there cutie!", carmen, false, 3000);
+        }
+    }
+    
+    // Check distance to husband
+    const distanceToHusband = character.position.distanceTo(husband.position);
+    if (distanceToHusband < interactionDistance) {
+        // Show husband's name
+        showCharacterName('Carmen\'s Husband', 2000);
+        
+        // Increase gayness stat when interacting with husband
+        stats.gayness = Math.min(100, stats.gayness + 8);
+        updateStatsUI();
+    }
+}
+
+// Speech bubble system
+function createSpeechBubble(text, characterObject, permanent = false, duration = 3000) {
+    let bubble = document.createElement('div');
+    bubble.className = 'speech-bubble';
+    bubble.textContent = text;
+    document.body.appendChild(bubble);
+    
+    // Function to update position based on character position
+    function updateBubblePosition() {
+        // Convert 3D position to screen coordinates
+        const vector = new THREE.Vector3();
+        vector.setFromMatrixPosition(characterObject.matrixWorld);
+        vector.project(camera);
+        
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = -(vector.y * 0.5 - 0.5) * window.innerHeight;
+        
+        bubble.style.left = `${x - (bubble.offsetWidth / 2)}px`;
+        bubble.style.top = `${y - 80}px`; // Position above character head
+    }
+    
+    // Add bubble to update loop
+    function bubbleUpdateLoop() {
+        if (!bubble) return;
+        updateBubblePosition();
+        if (permanent) requestAnimationFrame(bubbleUpdateLoop);
+    }
+    
+    bubbleUpdateLoop();
+    
+    // Remove bubble after duration unless permanent
+    if (!permanent) {
+        setTimeout(() => {
+            if (bubble) {
+                bubble.remove();
+                bubble = null;
             }
+        }, duration);
+    }
+    
+    return bubble;
+}
 
-            // Create environment objects
-            function createTree(x, z, scale = 1) {
-                const tree = new THREE.Group();
-
-                // Trunk
-                const trunkGeometry = new THREE.CylinderGeometry(0.2 * scale, 0.3 * scale, 1 * scale, 8);
-                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
-                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-                trunk.position.y = 0.5 * scale;
-                trunk.castShadow = true;
-                tree.add(trunk);
-
-                // Leaves
-                const leavesGeometry = new THREE.ConeGeometry(1 * scale, 2 * scale, 8);
-                const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Forest green
-                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-                leaves.position.y = 1.8 * scale;
-                leaves.castShadow = true;
-                tree.add(leaves);
-
-                tree.position.set(x, 0, z);
-                return tree;
-            }
-
-            function createBush(x, z, scale = 1) {
-                const bush = new THREE.Group();
-
-                // Create a random number of "puffs" for the bush
-                const puffCount = 3 + Math.floor(Math.random() * 3);
-                
-                for (let i = 0; i < puffCount; i++) {
-                    const puffGeometry = new THREE.SphereGeometry(0.3 * scale + Math.random() * 0.2 * scale, 8, 8);
-                    const puffMaterial = new THREE.MeshStandardMaterial({ 
-                        color: 0x2E8B57 // Sea green
-                    });
-                    const puff = new THREE.Mesh(puffGeometry, puffMaterial);
-                    
-                    // Position randomly but clustered
-                    puff.position.set(
-                        (Math.random() - 0.5) * 0.6 * scale,
-                        0.3 * scale + Math.random() * 0.2 * scale,
-                        (Math.random() - 0.5) * 0.6 * scale
-                    );
-                    
-                    puff.castShadow = true;
-                    bush.add(puff);
-                }
-                
-                bush.position.set(x, 0, z);
-                return bush;
-            }
-
-            // Create a sign
-            function createSign(text, x, y, z, width = 2, height = 0.8) {
-                const sign = new THREE.Group();
-                
-                // Sign post
-                const postGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8);
-                const postMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Brown
-                const post = new THREE.Mesh(postGeometry, postMaterial);
-                post.position.y = 0.6;
-                post.castShadow = true;
-                sign.add(post);
-                
-                // Sign board
-                const boardGeometry = new THREE.BoxGeometry(width, height, 0.05);
-                const boardMaterial = new THREE.MeshBasicMaterial({ color: 0xF5DEB3 }); // Wheat color
-                const board = new THREE.Mesh(boardGeometry, boardMaterial);
-                board.position.y = 1.2;
-                board.castShadow = true;
-                sign.add(board);
-                
-                // Create canvas for text
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.width = 256;
-                canvas.height = 128;
-                
-                // Background
-                context.fillStyle = '#F5DEB3';
-                context.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Text
-                context.font = 'bold 36px Arial';
-                context.textAlign = 'center';
-                context.textBaseline = 'middle';
-                context.fillStyle = '#000000';
-                context.fillText(text, canvas.width / 2, canvas.height / 2);
-                
-                // Apply canvas as texture
-                const texture = new THREE.CanvasTexture(canvas);
-                const textMaterial = new THREE.MeshBasicMaterial({ map: texture });
-                
-                // Create text mesh
-                const textGeometry = new THREE.PlaneGeometry(width - 0.1, height - 0.1);
-                const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-                textMesh.position.set(0, 1.2, 0.03);
-                sign.add(textMesh);
-                
-                sign.position.set(x, y, z);
-                return sign;
-            }
-
-            // Add environment objects
-            const trees = [
-                createTree(-8, -8, 1.5),
-                createTree(-7, 5, 1.2),
-                createTree(8, -7, 1.8),
-                createTree(10, 3, 1.3),
-                createTree(-4, 10, 1.4),
-                createTree(6, 10, 1.6)
-            ];
-
-            const bushes = [
-                createBush(-3, 0, 0.8),
-                createBush(-6, -2, 0.6),
-                createBush(-5, -6, 0.7),
-                createBush(6, -3, 0.5),
-                createBush(4, 8, 0.9),
-                createBush(-2, 7, 0.6),
-                createBush(0, -7, 0.8),
-                createBush(8, 6, 0.7)
-            ];
+// Character movement function
+function moveCharacter(targetPos) {
+    if (isMoving) return;
+    
+    // Set the target position
+    targetPosition.copy(targetPos);
+    
+    // Make sure character stays on the ground
+    targetPosition.y = character.position.y;
+    
+    // Calculate distance and duration based on speed
+    const distance = character.position.distanceTo(targetPosition);
+    const duration = (distance / CHARACTER_SPEED) * 1000; // Convert to milliseconds
+    
+    // Look at target
+    const lookAtPos = targetPosition.clone();
+    lookAtPos.y = character.position.y;
+    character.lookAt(lookAtPos);
+    
+    // Show character name when moving
+    showCharacterName('Mike', 2000);
+    
+    // Animate movement
+    isMoving = true;
+    new TWEEN.Tween(character.position)
+        .to({
+            x: targetPosition.x,
+            z: targetPosition.z
+        }, duration)
+        .easing(TWEEN.Easing.Quadratic.InOut)
+        .onComplete(() => {
+            isMoving = false;
+            
+            // Check if player is close to other characters and trigger interaction
+            checkCharacterInteractions();
+            
+            // Increase gayness stat when moving
+            stats.gayness = Math.min(100, stats.gayness + 1);
+            updateStatsUI();
+        })
+        .start();
+}
